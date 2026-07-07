@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MakuOS Web</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+    <div id="desktop" oncontextmenu="OS.showContextMenu(event, 'desktop')"></div>
+    <div id="window-area"></div>
+
+    <div id="start-menu" class="glass hidden">
+        <div class="start-search">
+            <i class="ph ph-magnifying-glass"></i>
+            <input type="text" id="start-search-input" placeholder="Поиск программ..." oninput="OS.filterStartMenu()">
+        </div>
+        <div class="start-content">
+            <div class="start-all-apps">
+                <h4>Все приложения</h4>
+                <ul id="app-list">
+                    <li onclick="WindowManager.open('calculator')"><i class="ph ph-calculator"></i> Калькулятор</li>
+                    <li onclick="WindowManager.open('notepad')"><i class="ph ph-notepad"></i> Блокнот</li>
+                    <li onclick="WindowManager.open('paint')"><i class="ph ph-palette"></i> Paint</li>
+                    <li onclick="WindowManager.open('cmd')"><i class="ph ph-terminal"></i> Командная строка</li>
+                    <li onclick="WindowManager.open('explorer')"><i class="ph ph-folder"></i> MakuFinder</li>
+                    <li onclick="WindowManager.open('mediaplayer')"><i class="ph ph-play-circle"></i> Медиаплеер</li>
+                </ul>
+            </div>
+            <div class="start-pinned">
+                <h4>Закрепленные</h4>
+                <div class="pinned-grid">
+                    <div class="pinned-item" onclick="WindowManager.open('settings')"><i class="ph-fill ph-gear"></i><span>Параметры</span></div>
+                    <div class="pinned-item" onclick="WindowManager.open('explorer')"><i class="ph-fill ph-folder"></i><span>Проводник</span></div>
+                    <div class="pinned-item" onclick="WindowManager.open('paint')"><i class="ph-fill ph-palette"></i><span>Paint</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="taskbar" class="glass">
+        <div class="taskbar-left"><button id="start-btn" class="taskbar-icon"><i class="ph-fill ph-windows-logo"></i></button></div>
+        <div class="taskbar-center" id="taskbar-apps"></div>
+        <div class="taskbar-right"><div class="taskbar-time" id="clock">12:00</div></div>
+    </div>
+
+    <div id="context-menu" class="glass hidden"></div>
+
+    <template id="tpl-settings">
+        <div class="app-settings">
+            <div class="settings-sidebar">
+                <div class="active" onclick="OS.switchTab(this, 'sys')">Система</div>
+                <div onclick="OS.switchTab(this, 'pers')">Персонализация</div>
+                <div onclick="OS.switchTab(this, 'stor')">Хранилище</div>
+                <div onclick="OS.switchTab(this, 'act')">Активация</div>
+            </div>
+            <div class="settings-content" id="set-sys">
+                <h2>Звук</h2>
+                <select class="os-select" id="reg-sound-out"><option>Динамики (Realtek(R) Audio)</option><option>Наушники Maku</option></select>
+                <button class="os-btn" style="margin-top:10px;" onclick="OS.bindCustomSounds()">Привязать свои звуки</button>
+                <hr>
+                <h2>Информация о ПК</h2>
+                <div class="sys-info-grid">
+                    <div class="info-label">Процессор:</div><div class="info-value">Intel Core Ultra 9 275HX</div>
+                    <div class="info-label">Ядра / Потоки:</div><div class="info-value">24 / 32</div>
+                    <div class="info-label">Видеокарта:</div><div class="info-value">NVIDIA GeForce RTX 5070 Ti</div>
+                    <div class="info-label">Видеопамять:</div><div class="info-value">16 GB GDDR6</div>
+                    <div class="info-label">ОЗУ:</div><div class="info-value">32 GB</div>
+                    <div class="info-label">Накопитель:</div><div class="info-value">Silicon Power UD90 4TB SSD</div>
+                </div>
+            </div>
+            <div class="settings-content hidden" id="set-pers">
+                <h2>Персонализация</h2>
+                <label>Обои (URL): <input type="text" class="os-input" id="reg-wall" placeholder="https://..."></label><br><br>
+                <label>Акцентный цвет: <input type="color" id="reg-color"></label><br><br>
+                <label>Положение панели задач: 
+                    <select class="os-select" id="reg-tb-pos">
+                        <option value="bottom">Снизу</option><option value="top">Сверху</option>
+                    </select>
+                </label><br><br>
+                <label><input type="checkbox" id="reg-group"> Группировать окна на панели</label><br><br>
+                <button class="os-btn" onclick="Registry.saveFromUI()">Сохранить настройки</button>
+            </div>
+            <div class="settings-content hidden" id="set-stor">
+                <h2>Анализ хранилища X:\</h2>
+                <div class="storage-bar"><div class="storage-used" id="stor-fill" style="width:0%"></div></div>
+                <p id="stor-info">Вычисление...</p>
+            </div>
+            <div class="settings-content hidden" id="set-act">
+                <h2>Активация MakuOS</h2>
+                <p style="color: #10b981; font-weight: bold; font-size: 16px; margin-top:20px;">
+                    <i class="ph-fill ph-check-circle"></i> Система активирована предоставленной лицензией от блогера Марка Аддерли
+                </p>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-notepad">
+        <div class="app-notepad">
+            <textarea id="np-text" placeholder="Начните печатать..."></textarea>
+            <div class="notepad-statusbar">
+                <span id="np-chars">Символов: 0</span><span id="np-lines">Строк: 1</span><span id="np-time">Время чтения: 0 мин</span>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-explorer">
+        <div class="app-explorer">
+            <div class="explorer-toolbar">
+                <button onclick="VFS.goUp()"><i class="ph ph-arrow-up"></i></button>
+                <input type="text" id="exp-path" class="os-input" readonly>
+                <label class="os-btn" style="margin:0;"><i class="ph ph-upload-simple"></i> Залить<input type="file" hidden onchange="VFS.uploadFile(event)"></label>
+            </div>
+            <div class="explorer-body" id="exp-view" oncontextmenu="OS.showContextMenu(event, 'explorer')"></div>
+        </div>
+    </template>
+
+    <template id="tpl-cmd">
+        <div class="app-cmd" id="cmd-container">
+            <div id="cmd-output">MakuOS [Version 1.0]<br>(c) Mark Adderly. All rights reserved.<br><br></div>
+            <div class="cmd-line"><span>X:\></span><input type="text" id="cmd-input" autocomplete="off"></div>
+        </div>
+    </template>
+
+    <template id="tpl-calculator">
+        <div class="app-calc">
+            <input type="text" id="calc-res" readonly value="0">
+            <div class="calc-grid" onclick="OS.calcInput(event)">
+                <button>C</button><button>&larr;</button><button>/</button><button>*</button>
+                <button>7</button><button>8</button><button>9</button><button>-</button>
+                <button>4</button><button>5</button><button>6</button><button>+</button>
+                <button>1</button><button>2</button><button>3</button><button style="grid-row: span 2;">=</button>
+                <button style="grid-column: span 2;">0</button><button>.</button>
+            </div>
+        </div>
+    </template>
+
+    <template id="tpl-paint">
+        <div class="app-paint">
+            <div class="paint-tools">
+                <input type="color" id="paint-color" value="#ffffff">
+                <input type="range" id="paint-size" min="1" max="20" value="5">
+                <button class="os-btn" onclick="OS.clearPaint()">Очистить</button>
+            </div>
+            <canvas id="paint-canvas" width="780" height="400"></canvas>
+        </div>
+    </template>
+
+    <template id="tpl-mediaplayer">
+        <div class="app-media">
+            <div id="media-view" class="media-container"><p style="padding:20px; color:#a1a1aa">Откройте медиафайл через Проводник</p></div>
+        </div>
+    </template>
+
+    <script src="script.js"></script>
+</body>
+</html>
